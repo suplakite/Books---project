@@ -1,0 +1,466 @@
+#include <iostream>
+#include <fstream>
+#include <string>
+#include "Parametry.h"
+#include "Struktury.h"
+#include "PrzetwarzaniePliku.h"
+#include "DetectMemoryLeaks.h"
+
+int main(int argc, char ** argv)
+{
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+	Parametry parametry;
+
+	if(!Sprawdz_Parametry(argc, argv, parametry)) 
+	{
+		pokazPomoc();
+		return 0;
+	}
+
+	Lista * glowa = nullptr;
+	Lista * ogon = nullptr;
+	
+	Pobierz_Z_Pliku(parametry.wejscie, glowa, ogon);
+	Rozpocznij_Zapis(glowa, parametry.wyjscie);
+	Usun_Liste(glowa);
+	
+	return 0;
+}
+
+
+PrzetwaraniePliku.h
+
+#pragma once
+#include "Struktury.h"
+#include "DetectMemoryLeaks.h"
+
+using std::cout;
+using std::fstream;
+
+
+/*
+opis
+Funkja pobiera linie z pliku nastenie przetwarza ja zapisujac do odowiednich stringów po czym
+wysyla je do odpowiednich funkcji które przetwarzaja je.
+paramety:
+	String plik - nazwa pliku z którego funkcja bedzie pobierala dane
+	Liste* &glowa - wskaznik na elementy listy
+	Liste* &ogon - wskaznik na koniec listy
+*/
+bool Pobierz_Z_Pliku(string plik, Lista* &glowa, Lista* &ogon)
+{
+	fstream pliczek;
+	pliczek.open(plik.c_str(), std::ios::in);
+	if (!pliczek.good())
+	{
+		Cos_Nie_Tak(2);
+		return false;
+	}
+
+	while (!pliczek.eof())
+	{
+		string linia;
+
+		getline(pliczek, linia);
+
+		string autor, tytul;
+
+		if (linia == "")
+		{
+			continue;
+		}
+
+		int x = linia.find(";");
+		if (x != string::npos)
+		{
+			autor = linia.substr(0, x);
+			linia = linia.erase(0, x + 2);
+		}
+		else
+		{
+			Cos_Nie_Tak(3);
+			return false;
+		}
+
+		x = linia.find(";");
+		if (x != string::npos)
+		{
+			tytul = linia.substr(0, x);
+			linia = linia.erase(0, x + 2);
+		}
+		else
+		{
+			Cos_Nie_Tak(3);
+			return false;
+		}
+
+		string etykieta;
+		do {
+			x = linia.find(",");
+
+			if (x != string::npos)
+			{
+				etykieta = linia.substr(0, x);
+				linia = linia.erase(0, x + 2);
+			}
+			else
+			{
+				etykieta = linia;
+			}
+
+			Drzewo* korzen_ptr = zwroc_Wskaznik_na_drzewo(glowa, etykieta);
+			Drzewo* korzen_w_liscie = dodaj_Do_Drzewa(korzen_ptr, autor, tytul);
+			Na_Poczatek(glowa, ogon, korzen_w_liscie, etykieta);
+
+		} while (x != string::npos);
+	}
+
+	
+	pliczek.close();
+	return true;
+}
+
+
+
+
+
+
+Struktury.h
+
+
+
+#pragma once
+#include "DetectMemoryLeaks.h"
+
+using std::string;
+using std::fstream;
+using std::cout;
+
+struct Drzewo
+{
+	string autor;
+	string tytul;
+
+	Drzewo* lewy;
+	Drzewo* prawy;
+};
+
+struct Lista
+{
+	string etykieta;
+	Drzewo* korzen;
+	Lista* nast;
+	Lista* poprz;
+};
+
+/*
+Opis:
+Funkcja ma za zadania sprawdzic, czy w liscie byla juz dodana etykieta ktora wlasnie pobralismy z pliku,
+jezeli taki element w liscie juz sie znajduje zwraca true, w przeciwnym wypadku false. Wykorzystywana w funkcji "Na_Poczatek_
+@Parametry
+Liste* glowa - wskaznik na elementy listy
+string &etykieta - etykieta pobrana z pliku
+*/
+bool Sprawdz_Czy_Etykieta_Istnieje(Lista* glowa, string &etykieta) {
+
+	bool ret = false;
+	while (glowa) {
+
+		if (glowa->etykieta == etykieta) {
+			ret = true;
+		}
+		glowa = glowa->nast;
+	}
+
+	return ret;
+
+}
+/*
+Opis:
+Wykorzystuje funkcje "Sprawdz_Czy_Etykieta_Istnieje" jezeli funkcja ta zwroci false, cala funkcja zatrzymuje prace, 
+w przeciwnym wypadku dodaje etykiety do listy
+@Parametry:
+Lista* &glowa - wskaznik na elementy listy
+Drzewo* korzen - wskaznik na elementy drzewa
+string &etykieta - etykieta pobrana z pliku
+*/
+bool Na_Poczatek(Lista* &glowa, Lista* &ogon, Drzewo* korzen, string &etykieta) {
+
+	if (Sprawdz_Czy_Etykieta_Istnieje(glowa, etykieta))
+		return false;
+
+	glowa = new Lista{etykieta, korzen, glowa, nullptr};
+	if (glowa->nast != nullptr)
+		glowa->nast->poprz = glowa;
+	else
+		ogon = glowa;
+
+	return true;
+}
+/*
+Opis:
+Zwraca wskaznik na drzewo
+@Parametry
+Lista* glowa - wskaznik na elementy listy
+string &etykieta - etykieta pobrana z pliku
+*/
+Drzewo* zwroc_Wskaznik_na_drzewo(Lista* glowa, string &etykieta) {
+
+	while (glowa) {
+		if (glowa->etykieta == etykieta)
+		{
+			return glowa->korzen;
+		}
+		glowa = glowa->nast;
+	}
+
+	return nullptr;
+}
+/*Opis:
+Funkcja dodaje posortowanych alfabetycznie od lewej autorow i ich tytulu do drzewa
+@Parametry:
+Drzewo* &korzen - wskaznik na elementy drzewa
+string &autor - autor pobrany z pliku
+string &tytul - tytul pobrany z pliku
+*/
+Drzewo* dodaj_Do_Drzewa(Drzewo* &korzen, string &autor, string &tytul) {
+	if (!korzen)
+		korzen = new Drzewo{ autor, tytul, nullptr, nullptr };
+	else if (korzen->autor < autor)
+		dodaj_Do_Drzewa(korzen->lewy, autor, tytul);
+	else
+		dodaj_Do_Drzewa(korzen->prawy, autor, tytul);
+
+	return korzen;
+}
+/*
+Opis:
+Zapisuje autorów i tytuly do pliku
+@Parametry
+fstream &file - plik do którego bedzie zapisywac
+Drzewo* korzen - wskaznik na element drzewa
+*/
+void Zapisz_Autorow(fstream &file, Drzewo* korzen) {
+
+	if (korzen)
+	{
+		Zapisz_Autorow(file, korzen->prawy);
+		file << korzen->autor << "; " << korzen->tytul << "\n";
+		Zapisz_Autorow(file, korzen->lewy);
+	}
+}
+/*
+Opis:
+Zapisuje etykiety do pliku, wykorzystuje funkcje Zapisz_Autorow w celu
+dopisania odpowiednim etykietom ich autorow
+@Parametry:
+Lista* glowa - wskaznik na element listy
+sring &nazwa_pliku - plik do ktorego bedzie zapisywany
+*/
+bool Rozpocznij_Zapis(Lista* glowa, string &nazwa_pliku)
+{
+	fstream file;
+	file.open(nazwa_pliku.c_str(), std::ios::out);
+
+	if (!file.good())
+		return false;
+
+	while (glowa) {
+		file << glowa->etykieta << ":\n";
+		Zapisz_Autorow(file, glowa->korzen);
+		file << "\n";
+		glowa = glowa->nast;
+	}
+	return true;
+}
+/*
+Opis:
+Funkcja wykorzystuje funkcje "Przejdz_Drzewo", a nastepnie usuwa je cale
+@Parametry
+Drzewo* &korzen - wskaznik na elementy drzewa
+*/
+void Usun_Drzewo(Drzewo* &korzen)
+{
+	if (korzen != nullptr)
+	{
+		Usun_Drzewo(korzen->lewy);
+		Usun_Drzewo(korzen->prawy);
+		delete korzen;
+		korzen = nullptr;
+	}
+}
+/*Opis
+Funkcja usuwa cala liste wraz z drzewami, wykorzystuje ona funkcje pomocnicza "Usun_Drzewo"
+@Parametry:
+Lista* &glowa - wskaznik na elementy listy
+Drzewo* korzen - wskaznik na elemety drzewa
+*/
+void Usun_Liste(Lista* &glowa)
+{
+	while (glowa)
+	{
+		Lista* pom = glowa;
+		Drzewo* korzen = glowa->korzen;
+		Usun_Drzewo(korzen);
+		glowa = glowa->nast;
+		
+		delete pom;
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+Parametry.h
+
+
+
+
+
+
+#pragma once
+#include "DetectMemoryLeaks.h"
+
+using std::string;
+using std::cout;
+
+struct Parametry
+{
+	string wejscie;
+	string wyjscie;
+
+	bool wejscie_podane = false;
+	bool wyjscie_podane = false;
+	bool pomoc_podane = false;
+};
+
+void pokazPomoc()
+{
+		cout << "------------------------------------------------------------" << "\n";
+		cout << "Program: Ksiazki" << " | " << "Wersja: 1.00" << "\n";
+		cout << "Twórca: Tomasz Migala" << "\n";
+		cout << "------------------------------------------------------------" << "\n";
+		cout << "Program pobiera dane z pliku, przetwarza je w odpowiedni sposob," << "\n";
+		cout << "a nastepnie sortuje wedlug nazwisk autorow, przyporzadkowanych, " << "\n";
+		cout << "do odpowiednich dzialow." << "\n";
+		cout << "------------------------------------------------------------" << "\n";
+		cout << "Poprawne parametry: -i Ksiazki.txt -o Output.txt" << "\n";
+	cout << "------------------------------------------------------------" << "\n";
+}
+void Cos_Nie_Tak(int i)
+{
+	if (i == 1)
+	{
+		cout << "------------------------------------------------------------" << "\n";
+		cout << "Prawdopodobnie podales bledne parametry!!" << "\n";
+
+	}
+	else if (i == 2)
+	{
+		cout << "------------------------------------------------------------" << "\n";
+		cout << "Nie znaleziono takiego pliku.\n";
+		cout << "Poprawna nazwa pliku: Ksiazki.txt \n";
+		cout << "------------------------------------------------------------" << "\n";
+		cout << "Poprawne parametry: -i Ksiazki.txt -o output.txt" << "\n";
+		cout << "------------------------------------------------------------" << "\n";
+	}
+	else if (i == 3)
+	{
+		cout << "------------------------------------------------------------" << "\n";
+		cout << "Sprawdz czy w pliku wejsciosym 'Ksiazki.txt' wszystkie dane wprowadzone sa" << "\n";
+		cout << "wedlug formatu: " << "\n";
+		cout << "AUTOR; TYTUL; ETYKIETA, ETYKIETA1(opcjonalnie)" << "\n";
+		cout << "------------------------------------------------------------" << "\n";
+		cout << "Poprawne parametry: -i Ksiazki.txt -o output.txt" << "\n";
+		cout << "------------------------------------------------------------" << "\n";
+	}
+	
+	
+}
+/*
+Opis:
+Srawdza, czy podane parametry sa poprawne jezeli nie zwraca false
+@Parametry:
+int argc - 
+char *argv[] - 
+Parametry &parametry - 
+*/
+bool Sprawdz_Parametry(int argc, char *argv[], Parametry &parametry) 
+{
+	string arg;
+
+	if (argc == 2) {
+		arg = argv[1];
+		if (arg == "-h")
+		{
+			parametry.pomoc_podane = true;
+			return false;
+		}
+	}
+	
+
+	for (int i = 0; i < argc - 1; i++)
+	{
+		arg = argv[i];
+
+		// Plik wyjsciowy
+		if (arg == "-o")
+		{
+			parametry.wyjscie = argv[i + 1];
+			parametry.wyjscie_podane = true;
+		}
+		
+		// Plik wejsciowy
+		if (arg == "-i") 
+		{
+			parametry.wejscie = argv[i + 1];
+			parametry.wejscie_podane = true;
+		}
+	}
+
+	if (parametry.wejscie_podane && parametry.wyjscie_podane) 
+	{
+		return true;
+	}
+	else
+	{
+		Cos_Nie_Tak(1);
+		return false;
+	}
+
+}
+
+
+
+
+
+
+
+
+
+DetectMemoryLeaks.h
+
+
+
+
+#pragma once
+
+
+
+#define _CRTDBG_MAP_ALLOC
+#include <stdlib.h>
+#include <crtdbg.h>
+#ifdef _DEBUG
+#ifndef DBG_NEW
+#define DBG_NEW new ( _NORMAL_BLOCK , __FILE__ , __LINE__ )
+#define new DBG_NEW
+#endif
+#endif 

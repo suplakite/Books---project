@@ -1,0 +1,34 @@
+antyk:
+Homer; Odyseja
+Jan Parandowski; Mitologia
+
+futurologia:
+Lem; Summa Technologiae
+
+lektura:
+Mickiewicz; Pan Tadeusz
+
+romantyzm:
+Mickiewicz; Pan Tadeusz
+
+klasyka:
+Mickiewicz; Pan Tadeusz
+
+podrecznik:
+Cormen; Algorytmy
+
+informatyka:
+Cormen; Algorytmy
+
+barok:
+Jan Andrzej Morsztyn; Do Trupa
+Molier; Swietoszek
+Shakespeare; Hamlet
+
+tragedia:
+Shakespeare; Hamlet
+
+filozofia:
+Lem; Summa Technologiae
+Platon; Uczta
+
